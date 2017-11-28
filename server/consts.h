@@ -3,8 +3,6 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <iostream>
-#include <list>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <string.h>
@@ -17,6 +15,7 @@
 #define NUM_EVENTS 5000
 #define MAX_CLIENTS 15000
 #define MSG_SIZE 1024
+#define LOGFILE "logfile"
 
 enum errors {
     ERR_SOCK_CREATE = 1,

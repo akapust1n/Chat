@@ -1,4 +1,5 @@
 #include "client.h"
+#include "logger.h"
 int closeSocket(int socket, char* msg)
 {
     send(socket, msg, strlen(msg), 0);
@@ -16,7 +17,7 @@ int closeSocket(int socket, char* msg)
     close(socket);
 }
 
-int newClient(int listener, int epollFD, int* clientsFD, int& numClients)
+int newClient(int listener, int epollFD, int* clientsFD, int* numClients)
 {
     struct epoll_event event;
     socklen_t addrlen;
@@ -37,27 +38,27 @@ int newClient(int listener, int epollFD, int* clientsFD, int& numClients)
         perror("setsockopt(SO_REUSEADDR) failed");
         return -ERR_REUSEADDR;
     }
-    if (numClients + 1 < MAX_CLIENTS) {
+    if ((*numClients + 1) < MAX_CLIENTS) {
         event.data.fd = newClientSocket;
         if (epoll_ctl(epollFD, EPOLL_CTL_ADD, newClientSocket, &event) < 0) {
             perror("Error epoll add");
             return -ERR_EPOLL_ADD;
         }
-        numClients++;
-        clientsFD[numClients] = newClientSocket;
+        *numClients += 1;
+        clientsFD[*numClients] = newClientSocket;
 
     } else {
         closeSocket(newClientSocket, "cant add client");
     }
 }
 
-void removeClient(int* clients, int index, int& count)
+void removeClient(int* clients, int index, int* count)
 {
 
-    memmove(clients + index, clients + index + 1, count - index - 1);
-    count--;
+    memmove(clients + index, clients + index + 1, *count - index - 1);
+    *count -= 1;
 }
-int handleMessage(int* clients, int index, int& count)
+int handleMessage(int* clients, int index, int* count, int logger)
 {
 
     char message[MSG_SIZE];
@@ -72,16 +73,19 @@ int handleMessage(int* clients, int index, int& count)
         }
         removeClient(clients, index, count);
     } else {
-        if (count == 1) {
+        if (*count == 1) {
             char* msg = "noone connected";
             send(clients[index], msg, strlen(msg), 0);
             return 1;
         } else {
-            for (int i = 0; i < count; i++) {
+            message[len] = '\0';
+            writeLog(logger, clients[index], message);
+
+            for (int i = 0; i < *count; i++) {
                 if (i != index) {
-                    int sentbytes = 0;
-                    while (sentbytes < len)
-                        sentbytes = send(clients[index], message + sentbytes, len - sentbytes, 0);
+                    int sentBytes = 0;
+                    while (sentBytes < len)
+                        sentBytes = send(clients[index], message + sentBytes, len - sentBytes, 0);
                 }
             }
         }

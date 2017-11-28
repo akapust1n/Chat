@@ -54,6 +54,7 @@ int main(int argc, char* argv[])
 {
     int listener = startListen(8080);
     int epollFD = createEpoll(listener);
+    int logger = open(LOGFILE, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
 
     struct epoll_event events[NUM_EVENTS];
     int clientsFD[MAX_CLIENTS];
@@ -68,7 +69,7 @@ int main(int argc, char* argv[])
             if (events[i].data.fd == listener) {
                 if (newClient(listener, epollFD, clientsFD, numClients) < 0) {
                     perror("Can create new client!");
-                } else if (handleMessage(clientsFD, i, numClients) < 0) {
+                } else if (handleMessage(clientsFD, i, numClients, logger) < 0) {
                     perror("Can handle message!");
                 }
             }
