@@ -16,6 +16,7 @@
 
 #define NUM_EVENTS 5000
 #define MAX_CLIENTS 15000
+#define MSG_SIZE 1024
 
 enum errors {
     ERR_SOCK_CREATE = 1,
@@ -26,7 +27,9 @@ enum errors {
     ERR_EPOLL_CREATE,
     ERR_ACCEPT_CLIENT,
     ERR_EPOLL_ADD,
-    ERR_SOCK_READ
+    ERR_SOCK_READ,
+    ERR_READ_MSG,
+    ERR_SOCK_CLOSE
 };
 
 #endif // CONSTS_H

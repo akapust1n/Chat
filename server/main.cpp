@@ -62,12 +62,14 @@ int main(int argc, char* argv[])
     while (1) {
         if (numFD == epoll_wait(epollFD, events, NUM_EVENTS, -1) < 0) {
             perror("Error epoll_wait");
-            exit(-9);
+            // exit(-9);
         }
         for (int i = 0; i < numFD; i++) {
             if (events[i].data.fd == listener) {
                 if (newClient(listener, epollFD, clientsFD, numClients) < 0) {
                     perror("Can create new client!");
+                } else if (handleMessage(clientsFD, i, numClients) < 0) {
+                    perror("Can handle message!");
                 }
             }
         }

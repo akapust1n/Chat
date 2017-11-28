@@ -1,5 +1,4 @@
 #include "client.h"
-#include "consts.h"
 int closeSocket(int socket, char* msg)
 {
     send(socket, msg, strlen(msg), 0);
@@ -50,4 +49,43 @@ int newClient(int listener, int epollFD, int* clientsFD, int& numClients)
     } else {
         closeSocket(newClientSocket, "cant add client");
     }
+}
+
+void removeClient(int* clients, int index, int& count)
+{
+
+    memmove(clients + index, clients + index + 1, count - index - 1);
+    count--;
+}
+int handleMessage(int* clients, int index, int& count)
+{
+
+    char message[MSG_SIZE];
+    bzero(message, MSG_SIZE);
+
+    int len;
+
+    if (len = recv(clients[index], message, MSG_SIZE, 0) == 0) {
+
+        if (close(clients[index]) < 0) {
+            return -ERR_SOCK_CLOSE;
+        }
+        removeClient(clients, index, count);
+    } else {
+        if (count == 1) {
+            char* msg = "noone connected";
+            send(clients[index], msg, strlen(msg), 0);
+            return 1;
+        } else {
+            for (int i = 0; i < count; i++) {
+                if (i != index) {
+                    int sentbytes = 0;
+                    while (sentbytes < len)
+                        sentbytes = send(clients[index], message + sentbytes, len - sentbytes, 0);
+                }
+            }
+        }
+    }
+
+    return len;
 }
