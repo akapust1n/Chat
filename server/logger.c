@@ -1,12 +1,19 @@
 #include "logger.h"
 #include "string.h"
+#include <time.h>
 #include <unistd.h>
 
-void writeLog(int logfile, int author, const char* message)
+void writeLog(FILE* logfile, int author, const char* message)
 {
-    int len = strlen(message) + 50;
-    char buf[len];
+    time_t rawtime;
+    struct tm* timeinfo;
 
-    snprintf(buf, len, "%d : %s \n", author, message);
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    int len = strlen(message) + 30;
+    char buf[len];
+    bzero(buf, len);
+
+    snprintf(buf, len, "\n%s %d : %s ", asctime(timeinfo), author, message);
     write(logfile, buf, len);
 }

@@ -57,10 +57,16 @@ int newClient(int listener, int epollFD, int* clientsFD, int* numClients)
     }
 }
 
-void removeClient(int* clients, int index, int* count)
+void removeClient(int* clients, int authorSock, int* count)
 {
 
-    memmove(clients + index, clients + index + 1, *count - index - 1);
+    int i = 0;
+    for (; i < *count && clients[i] != authorSock; i++)
+        ;
+
+    if (i == count)
+        return -1;
+    memmove(clients + i, clients + i + 1, *count - i - 1);
     *count -= 1;
 }
 int handleMessage(int* clients, int authorSock, int* count, int logger)
