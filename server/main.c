@@ -4,7 +4,7 @@
 int startListen(int port)
 {
     int listener;
-    if (listener = socket(AF_INET, SOCK_STREAM, 0) < 0) {
+    if ((listener = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("Error socker create");
         exit(-ERR_SOCK_CREATE);
     }
@@ -20,7 +20,7 @@ int startListen(int port)
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = inet_addr(INADDR_ANY);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     if (bind(listener, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         perror("Error socket bind");
@@ -37,7 +37,7 @@ int createEpoll(int listenFD)
 {
     int epollFD;
 
-    if (epollFD = epoll_create(1) < 0) {
+    if ((epollFD = epoll_create(1)) < 0) {
         perror("Error epoll create");
         exit(-ERR_EPOLL_CREATE);
     }
@@ -49,6 +49,7 @@ int createEpoll(int listenFD)
         perror("Epoll fd add");
         exit(-ERR_EPOLL_ADD);
     }
+    return epollFD;
 }
 int main(int argc, char* argv[])
 {
@@ -61,18 +62,23 @@ int main(int argc, char* argv[])
     int numFD, numClients = 0;
 
     while (1) {
-        if (numFD == epoll_wait(epollFD, events, NUM_EVENTS, -1) < 0) {
+        if ((numFD = epoll_wait(epollFD, events, NUM_EVENTS, -1)) < 0) {
             perror("Error epoll_wait");
             // exit(-9);
         }
         for (int i = 0; i < numFD; i++) {
             if (events[i].data.fd == listener) {
-                if (newClient(listener, epollFD, clientsFD, numClients) < 0) {
+                if (newClient(listener, epollFD, clientsFD, &numClients) < 0) {
+                    printf("NEW client\n");
                     perror("Can create new client!");
-                } else if (handleMessage(clientsFD, i, numClients, logger) < 0) {
-                    perror("Can handle message!");
+                }
+            } else {
+                int authorSock = events[i].data.fd;
+                if (handleMessage(clientsFD, authorSock, &numClients, logger) < 0) {
+                    perror("Canе handle message!");
                 }
             }
         }
     }
+    close(logger);
 }

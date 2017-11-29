@@ -25,7 +25,7 @@ int newClient(int listener, int epollFD, int* clientsFD, int* numClients)
 
     struct sockaddr clientaddr;
     int newClientSocket;
-    if (newClientSocket = accept(listener, (struct sockaddr*)&clientaddr, &addrlen) < 0) {
+    if ((newClientSocket = accept(listener, (struct sockaddr*)&clientaddr, &addrlen)) < 0) {
         perror("Error accept client");
         return -ERR_ACCEPT_CLIENT;
     }
@@ -44,9 +44,14 @@ int newClient(int listener, int epollFD, int* clientsFD, int* numClients)
             perror("Error epoll add");
             return -ERR_EPOLL_ADD;
         }
-        *numClients += 1;
         clientsFD[*numClients] = newClientSocket;
-
+        *numClients += 1;
+        int sentBytes = 0;
+        char* msg = "Hello\n";
+        int len = strlen(msg);
+        while (sentBytes < len) {
+            sentBytes += send(clientsFD[*numClients - 1], msg + sentBytes, len - sentBytes, 0);
+        }
     } else {
         closeSocket(newClientSocket, "cant add client");
     }
@@ -58,34 +63,40 @@ void removeClient(int* clients, int index, int* count)
     memmove(clients + index, clients + index + 1, *count - index - 1);
     *count -= 1;
 }
-int handleMessage(int* clients, int index, int* count, int logger)
+int handleMessage(int* clients, int authorSock, int* count, int logger)
 {
+    printf("HANDLE MESSAGE \n");
 
     char message[MSG_SIZE];
     bzero(message, MSG_SIZE);
 
     int len;
 
-    if (len = recv(clients[index], message, MSG_SIZE, 0) == 0) {
+    if ((len = recv(authorSock, message, MSG_SIZE, 0)) == 0) {
 
-        if (close(clients[index]) < 0) {
+        if (close(authorSock) < 0) {
             return -ERR_SOCK_CLOSE;
         }
-        removeClient(clients, index, count);
+        removeClient(clients, authorSock, count);
     } else {
         if (*count == 1) {
-            char* msg = "noone connected";
-            send(clients[index], msg, strlen(msg), 0);
+            const char* msg = "noone connected\n";
+            int sentBytes = 0;
+            int len = strlen(msg);
+            while (sentBytes < len)
+                sentBytes += send(authorSock, msg, strlen(msg), 0);
+
             return 1;
         } else {
-            message[len] = '\0';
-            writeLog(logger, clients[index], message);
+            message[len] = '\n';
+            message[len + 1] = '\0';
+            writeLog(logger, authorSock, message);
 
             for (int i = 0; i < *count; i++) {
-                if (i != index) {
+                if (clients[i] != authorSock) {
                     int sentBytes = 0;
                     while (sentBytes < len)
-                        sentBytes = send(clients[index], message + sentBytes, len - sentBytes, 0);
+                        sentBytes += send(clients[i], message + sentBytes, len - sentBytes, 0);
                 }
             }
         }
