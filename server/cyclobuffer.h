@@ -1,0 +1,4 @@
+#ifndef CYCLOBUFFER_H
+#define CYCLOBUFFER_H
+
+#endif // CYCLOBUFFER_H
