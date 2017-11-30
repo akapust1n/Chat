@@ -1,9 +1,15 @@
 #include "logger.h"
 #include "string.h"
+#include "structs.h"
 #include <time.h>
 #include <unistd.h>
+static int logger;
+void openLog()
+{
+    logger = open(LOGFILE, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+}
 
-void writeLog(FILE* logfile, int author, const char* message)
+void writeLog(int author, const char* message)
 {
     time_t rawtime;
     struct tm* timeinfo;
@@ -15,5 +21,9 @@ void writeLog(FILE* logfile, int author, const char* message)
     bzero(buf, len);
 
     snprintf(buf, len, "\n%s %d : %s ", asctime(timeinfo), author, message);
-    write(logfile, buf, len);
+    write(LOGFILE, buf, len);
+}
+void closeLog()
+{
+    close(logger);
 }

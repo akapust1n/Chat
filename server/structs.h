@@ -1,9 +1,11 @@
-#ifndef CONSTS_H
-#define CONSTS_H
+#ifndef STRUCTS_H
+#define STRUCTS_H
+#include "cyclobuffer.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/epoll.h>
@@ -13,8 +15,10 @@
 #include <unistd.h>
 
 #define NUM_EVENTS 5000
+#define PORT 8080
 #define MAX_CLIENTS 15000
 #define MSG_SIZE 1024
+#define CYCLOBUF_SIZE MSG_SIZE * 5
 #define LOGFILE "logfile"
 
 enum errors {
@@ -30,5 +34,13 @@ enum errors {
     ERR_READ_MSG,
     ERR_SOCK_CLOSE
 };
+struct context {
+    bool writable;
+    struct cycloBuffer buffer;
+};
+struct user {
+    int fd;
+    struct context* m_context;
+};
 
-#endif // CONSTS_H
+#endif // STRUCTS_H

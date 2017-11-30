@@ -1,5 +1,6 @@
 #include "client.h"
-#include "consts.h"
+#include "logger.h"
+#include "structs.h"
 
 int startListen(int port)
 {
@@ -53,15 +54,15 @@ int createEpoll(int listenFD)
 }
 int main(int argc, char* argv[])
 {
-    int listener = startListen(8080);
+    int listener = startListen(PORT);
     int epollFD = createEpoll(listener);
-    int logger = open(LOGFILE, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
 
     struct epoll_event events[NUM_EVENTS];
-    int clientsFD[MAX_CLIENTS];
+    struct user clientsFD[MAX_CLIENTS];
     int numFD, numClients = 0;
-
+    openLog();
     while (1) {
+
         if ((numFD = epoll_wait(epollFD, events, NUM_EVENTS, -1)) < 0) {
             perror("Error epoll_wait");
             // exit(-9);
@@ -69,16 +70,14 @@ int main(int argc, char* argv[])
         for (int i = 0; i < numFD; i++) {
             if (events[i].data.fd == listener) {
                 if (newClient(listener, epollFD, clientsFD, &numClients) < 0) {
-                    printf("NEW client\n");
                     perror("Can create new client!");
                 }
             } else {
-                int authorSock = events[i].data.fd;
-                if (handleMessage(clientsFD, authorSock, &numClients, logger) < 0) {
+                if (handleMessage(clientsFD, events[i], &numClients) < 0) {
                     perror("Canе handle message!");
                 }
             }
         }
     }
-    close(logger);
+    closeLog();
 }

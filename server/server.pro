@@ -17,9 +17,11 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
     client.c \
     logger.c \
-    main.c
+    main.c \
+    cyclobuffer.c
 
 HEADERS += \
-    consts.h \
     client.h \
-    logger.h
+    logger.h \
+    cyclobuffer.h \
+    structs.h
