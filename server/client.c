@@ -29,7 +29,7 @@ int newClient(int listener, int epollFD, struct user* clientsFD, int* numClients
 
     struct epoll_event event;
     socklen_t addrlen;
-    event.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLET;
+    event.events = EPOLLOUT | EPOLLIN | EPOLLRDHUP | EPOLLET;
 
     struct sockaddr clientaddr;
     int newClientSocket;
@@ -47,13 +47,20 @@ int newClient(int listener, int epollFD, struct user* clientsFD, int* numClients
         return -ERR_REUSEADDR;
     }
     if ((*numClients + 1) < MAX_CLIENTS) {
-        event.data.fd = newClientSocket;
+        // event.data.fd = newClientSocket;
         event.data.ptr = (struct context*)malloc(sizeof(struct context));
+        ((struct context*)event.data.ptr)->fd = newClientSocket;
         if (epoll_ctl(epollFD, EPOLL_CTL_ADD, newClientSocket, &event) < 0) {
             perror("Error epoll add");
             return -ERR_EPOLL_ADD;
         };
         struct user temp = { .fd = newClientSocket, .m_context = event.data.ptr };
+        temp.m_context->buffer = (struct cycloBuffer*)malloc(sizeof(struct cycloBuffer));
+        temp.m_context->buffer->buffer = (char*)malloc(sizeof(char) * MSG_SIZE);
+        bzero(temp.m_context->buffer->buffer, MSG_SIZE);
+        const char* heello = "hello";
+        memmove(temp.m_context->buffer->buffer, heello, strlen(heello));
+        temp.m_context->buffer->capacity = MSG_SIZE;
         clientsFD[*numClients] = temp;
         *numClients += 1;
         int sentBytes = 0;
@@ -74,10 +81,16 @@ void removeClient(int* clients, int authorSock, int* count, struct epoll_event e
     for (; i < *count && clients[i] != authorSock; i++)
         ;
 
-    if (i == count)
+    if (i == *count)
         return -1;
     if (event.data.ptr)
         free(event.data.ptr);
+
+    if (((struct context*)event.data.ptr)->buffer->buffer)
+        free(((struct context*)event.data.ptr)->buffer->buffer);
+    if (((struct context*)event.data.ptr)->buffer)
+        free(((struct context*)event.data.ptr)->buffer);
+
     closeSocket(authorSock, "bye");
     memmove(clients + i, clients + i + 1, *count - i - 1);
     *count -= 1;
@@ -86,7 +99,7 @@ void removeClient(int* clients, int authorSock, int* count, struct epoll_event e
 int handleMessage(struct user* clients, struct epoll_event event, int* count)
 {
     printf("HANDLE MESSAGE \n");
-    int authorSock = event.data.fd;
+    int authorSock = ((struct context*)event.data.ptr)->fd;
 
     if (event.events & EPOLLRDHUP || event.events & EPOLLHUP || event.events & EPOLLERR) {
         removeClient(clients, authorSock, count, event);
@@ -98,15 +111,17 @@ int handleMessage(struct user* clients, struct epoll_event event, int* count)
     int len;
 
     if (event.events & EPOLLIN) {
-        if ((len = handleEpollin(authorSock, message)) < 1) {
+        if ((len = handleEpollin(authorSock, message)) < 1 && errno != EAGAIN && errno != EWOULDBLOCK) {
             removeClient(clients, authorSock, count, event);
             return 0;
         }
 
         message[len] = '\0';
+        sendOthers(clients, event, count, message, len);
     }
     if (event.events & EPOLLOUT) {
-        setWritable(authorSock, clients, count);
+        printf("EPOLLOUT \n");
+        setWritable(authorSock, clients, *count);
     }
     if (*count == 1) {
         const char* msg = "noone connected\n";
@@ -115,8 +130,7 @@ int handleMessage(struct user* clients, struct epoll_event event, int* count)
     } else {
         writeLog(authorSock, message);
     }
-    sendOthers(clients, event, count, message, len);
-
+    //fflush
     return len;
 }
 void setWritable(int fd, struct user* clients, int count)
@@ -130,16 +144,23 @@ void setWritable(int fd, struct user* clients, int count)
 }
 int writeToBuffer(char* msg, struct epoll_event event)
 {
-    struct cycloBuffer* buffer = (struct cycloBuffer*)event.data.ptr;
+    struct cycloBuffer* buffer = ((struct context*)event.data.ptr)->buffer;
+
     int datasize = strlen(msg);
     append(buffer, msg, datasize);
 }
 int handleNoone(int authorSock, char* message)
 {
     int sentBytes = 0;
+    int numBytes = 0;
     int len = strlen(message);
-    while (sentBytes < len) //если не доставилось - не критично
-        sentBytes += send(authorSock, message, len - sentBytes, 0);
+    while (sentBytes < len) { //если не доставилось - не критично
+        numBytes = send(authorSock, message, len - sentBytes, 0);
+        if (numBytes == -1) {
+            break;
+        }
+        sentBytes += numBytes;
+    }
 }
 
 int handleEpollin(int authorSock, char* message)
@@ -149,8 +170,8 @@ int handleEpollin(int authorSock, char* message)
     int numBytes = 0;
     while (recvBytes < MSG_SIZE - 2) {
         numBytes = recv(authorSock, message + recvBytes, MSG_SIZE - recvBytes, 0);
-        if (numBytes == -1) {
-            return -1;
+        if (numBytes < 1) {
+            break;
         }
         recvBytes += numBytes;
     }
@@ -158,14 +179,14 @@ int handleEpollin(int authorSock, char* message)
 }
 int sendOthers(struct user* clients, struct epoll_event event, int* count, char* message, int len)
 {
-    int authorSock = event.data.fd;
+    int authorSock = ((struct context*)event.data.ptr)->fd;
     for (int i = 0; i < *count; i++) {
         if (clients[i].fd != authorSock) {
-            writeToBuffer(message, event);
+            //  writeToBuffer(message, event);
             int sentBytes = 0;
             int numBytes = 0;
 
-            while (((struct context*)clients[i].m_context)->writable) { //while writable
+            while (((struct context*)clients[i].m_context)->writable && sentBytes < len) { //while writable
                 numBytes = send(clients[i].fd, message + sentBytes, len - sentBytes, 0);
                 if (numBytes != -1) {
                     sentBytes += numBytes;
@@ -174,7 +195,7 @@ int sendOthers(struct user* clients, struct epoll_event event, int* count, char*
                         ((struct context*)event.data.ptr)->writable = false;
                 }
             }
-            moveHead((&(clients[i].m_context)->buffer), numBytes);
+            // moveHead((&(clients[i].m_context)->buffer), numBytes);
         }
     }
     return 0;

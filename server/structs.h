@@ -36,7 +36,8 @@ enum errors {
 };
 struct context {
     bool writable;
-    struct cycloBuffer buffer;
+    int fd;
+    struct cycloBuffer* buffer;
 };
 struct user {
     int fd;
