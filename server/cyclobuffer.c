@@ -10,28 +10,29 @@ void append(struct cycloBuffer* buffer, char* data, int datasize)
             expand(buffer);
         }
         if ((buffer->capacity - buffer->tail) > datasize) {
-            memcpy((char*)buffer->buffer[buffer->tail], data, datasize);
+            memcpy(buffer->buffer + buffer->tail, data, datasize);
         } else { //если места не хватает
             //записываем capacity - tail bytes
             int writeBytes = buffer->capacity - buffer->tail;
-            memcpy((char*)buffer->buffer[buffer->tail], data, writeBytes);
+            memcpy(buffer->buffer + buffer->tail, data, writeBytes);
             memcpy(buffer->buffer, data + writeBytes, datasize - writeBytes);
             buffer->tail = datasize - writeBytes;
         }
 
     } else {
-        if ((buffer->head - buffer->tail) < datasize) {
+        if ((buffer->capacity - (buffer->head - buffer->tail)) < datasize) {
             expand(buffer);
         }
-        memcpy((char*)buffer->buffer[buffer->tail], data, datasize);
+        memcpy(buffer->buffer + buffer->tail, data, datasize);
         buffer->tail += datasize;
     }
 }
 
-char* getData(struct cycloBuffer* buffer, char* dataBuffer, int dataBufferSize)
+void getData(struct cycloBuffer* buffer, char* dataBuffer, int dataBufferSize)
 {
     int countBytes = 0;
-    if (buffer->tail > buffer->head)
+
+    if (buffer->tail >= buffer->head) //memmove :)
         for (int i = buffer->head; i < buffer->tail && dataBufferSize > countBytes; i++) {
             dataBuffer[countBytes] = buffer->buffer[i];
             countBytes++;
@@ -61,4 +62,5 @@ void expand(struct cycloBuffer* buffer)
     memmove(temp + buffer->capacity * 2 - buffer->tail, buffer->buffer, buffer->tail);
     if (buffer->buffer)
         free(buffer->buffer);
+    buffer->buffer = temp;
 }

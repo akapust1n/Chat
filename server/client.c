@@ -5,7 +5,7 @@ void setWritable(int fd, struct user* clients, int count);
 int writeToBuffer(char* msg, struct epoll_event event);
 int handleNoone(int authorSock, char* message);
 int handleEpollin(int authorSock, char* message);
-int sendOthers(struct user* clients, struct epoll_event event, int* count, char* message, int len);
+int sendOthers(struct user* clients, struct epoll_event event, int* count, char* message);
 
 int closeSocket(int socket, char* msg)
 {
@@ -117,20 +117,19 @@ int handleMessage(struct user* clients, struct epoll_event event, int* count)
         }
 
         message[len] = '\0';
-        sendOthers(clients, event, count, message, len);
+        writeLog(authorSock, message);
+        sendOthers(clients, event, count, message);
     }
     if (event.events & EPOLLOUT) {
         printf("EPOLLOUT \n");
         setWritable(authorSock, clients, *count);
+        flush(((struct context*)event.data.ptr));
     }
     if (*count == 1) {
         const char* msg = "noone connected\n";
         handleNoone(authorSock, msg);
         return 0;
-    } else {
-        writeLog(authorSock, message);
     }
-    //fflush
     return len;
 }
 void setWritable(int fd, struct user* clients, int count)
@@ -142,13 +141,13 @@ void setWritable(int fd, struct user* clients, int count)
         }
     }
 }
-int writeToBuffer(char* msg, struct epoll_event event)
-{
-    struct cycloBuffer* buffer = ((struct context*)event.data.ptr)->buffer;
+//int writeToBuffer(char* msg, struct epoll_event event)
+//{
+//    struct cycloBuffer* buffer = ((struct context*)event.data.ptr)->buffer;
 
-    int datasize = strlen(msg);
-    append(buffer, msg, datasize);
-}
+//    int datasize = strlen(msg);
+//    append(buffer, msg, datasize);
+//}
 int handleNoone(int authorSock, char* message)
 {
     int sentBytes = 0;
@@ -177,17 +176,20 @@ int handleEpollin(int authorSock, char* message)
     }
     return recvBytes;
 }
-int sendOthers(struct user* clients, struct epoll_event event, int* count, char* message, int len)
+int sendOthers(struct user* clients, struct epoll_event event, int* count, char* message)
 {
     int authorSock = ((struct context*)event.data.ptr)->fd;
     for (int i = 0; i < *count; i++) {
         if (clients[i].fd != authorSock) {
-            //  writeToBuffer(message, event);
+            append(clients[i].m_context->buffer, message, strlen(message));
             int sentBytes = 0;
             int numBytes = 0;
-
+            char msg[MSG_SIZE];
+            bzero(msg, MSG_SIZE);
+            getData(clients[i].m_context->buffer, msg, MSG_SIZE);
+            int len = strlen(msg);
             while (((struct context*)clients[i].m_context)->writable && sentBytes < len) { //while writable
-                numBytes = send(clients[i].fd, message + sentBytes, len - sentBytes, 0);
+                numBytes = send(clients[i].fd, msg + sentBytes, len - sentBytes, 0);
                 if (numBytes != -1) {
                     sentBytes += numBytes;
                 } else {
@@ -195,8 +197,41 @@ int sendOthers(struct user* clients, struct epoll_event event, int* count, char*
                         ((struct context*)event.data.ptr)->writable = false;
                 }
             }
-            // moveHead((&(clients[i].m_context)->buffer), numBytes);
+            moveHead(clients[i].m_context->buffer, sentBytes);
+            //  flush(clients[i].m_context);
         }
     }
     return 0;
+}
+
+void flush(struct context* context)
+{
+
+    //    char msg[MSG_SIZE];
+    //    bzero(msg, MSG_SIZE);
+    //    getData(context->buffer, msg, MSG_SIZE);
+    //    int len = strlen(msg);
+    //    do {
+    //        int sentBytes = 0;
+    //        int numBytes = 0;
+    //        while (context->writable && sentBytes < len) { //while writable
+    //            numBytes = send(context->fd, msg + sentBytes, len - sentBytes, 0);
+    //            if (numBytes != -1) {
+    //                sentBytes += numBytes;
+    //            } else {
+    //                if (errno == EAGAIN || errno == EWOULDBLOCK)
+    //                    context->writable = false;
+    //            }
+    //        }
+
+    //        moveHead(context->buffer, sentBytes);
+    //        if (numBytes == -1) {
+    //            break;
+    //        }
+    //        bzero(msg, MSG_SIZE);
+    //        getData(context->buffer, msg, MSG_SIZE);
+    //        len = strlen(msg);
+    //        printf("len %d \n", len);
+
+    //    } while (len && context->writable);
 }

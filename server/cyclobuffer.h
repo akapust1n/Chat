@@ -7,7 +7,7 @@ struct cycloBuffer {
     int tail; //первый свободный
     int head; //первый занятый
 };
-char* getData(struct cycloBuffer* buffer, char* dataBuffer, int dataBufferSize);
+void getData(struct cycloBuffer* buffer, char* dataBuffer, int dataBufferSize);
 void append(struct cycloBuffer* buffer, char* data, int datasize);
 
 void moveHead(struct cycloBuffer* buffer, int numBytes);
